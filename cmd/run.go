@@ -40,12 +40,19 @@ var runListCmd = &cobra.Command{
 		status, _ := cmd.Flags().GetString("status")
 		operation, _ := cmd.Flags().GetString("operation")
 		query, _ := cmd.Flags().GetString("query")
+		listAll, _ := cmd.Flags().GetBool("list-all")
 
 		// Get workspaceName by ID
 		workspaceName, _ := getWorkspaceNameByID(client, organization, workspaceID)
 
 		// List runs in workspace
-		runs, _ := listRun(client, workspaceID, status, operation)
+		var runs []*tfe.Run
+
+		if listAll {
+			runs, _ = listAllRuns(client, workspaceID, status, operation)
+		} else {
+			runs, _ = listRun(client, workspaceID, status, operation)
+		}
 
 		var runJson []byte
 		var runList []Run
@@ -377,6 +384,7 @@ func init() {
 	runListCmd.Flags().String("workspace-id", "", "WorkspaceID of the TFE workspace")
 	runListCmd.Flags().String("status", "", "Filter by run status")
 	runListCmd.Flags().String("operation", "", "Filter by run operation")
+	runListCmd.Flags().Bool("list-all", false, "List all relevant runs, not just the first page")
 
 	// Queue sub-command
 	runQueueCmd.Flags().String("filter", "", "Queue plans on workspaces matching filter")          // Mutually exclusive with `ids`
@@ -420,6 +428,38 @@ func listRun(client *tfe.Client, workspaceID string, status string, operation st
 		return nil, err
 	}
 	results = append(results, r.Items...)
+
+	return results, nil
+}
+
+func listAllRuns(client *tfe.Client, workspaceID string, status string, operation string) ([]*tfe.Run, error) {
+	results := []*tfe.Run{}
+
+	currentPage := 1
+
+	for {
+		log.Debugf("Processing page %d.\n", currentPage)
+		options := &tfe.RunListOptions{
+			ListOptions: tfe.ListOptions{
+				PageNumber: currentPage,
+				PageSize:   50,
+			},
+			Status:    status,
+			Operation: operation,
+		}
+
+		r, err := client.Runs.List(context.Background(), workspaceID, options)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, r.Items...)
+
+		if r.Pagination.NextPage == 0 {
+			break
+		}
+
+		currentPage++
+	}
 
 	return results, nil
 }
