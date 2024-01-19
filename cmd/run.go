@@ -48,11 +48,7 @@ var runListCmd = &cobra.Command{
 		// List runs in workspace
 		var runs []*tfe.Run
 
-		if listAll {
-			runs, _ = listAllRuns(client, workspaceID, status, operation)
-		} else {
-			runs, _ = listRun(client, workspaceID, status, operation)
-		}
+		runs, _ = listRuns(client, workspaceID, status, operation, listAll)
 
 		var runJson []byte
 		var runList []Run
@@ -408,33 +404,8 @@ func init() {
 
 }
 
-func listRun(client *tfe.Client, workspaceID string, status string, operation string) ([]*tfe.Run, error) {
+func listRuns(client *tfe.Client, workspaceID string, status string, operation string, listAll bool) ([]*tfe.Run, error) {
 	results := []*tfe.Run{}
-	// We only care about the first few runs at this point
-	currentPage := 1
-
-	log.Debugf("Processing page %d.\n", currentPage)
-	options := &tfe.RunListOptions{
-		ListOptions: tfe.ListOptions{
-			PageNumber: currentPage,
-			PageSize:   20,
-		},
-		Status:    status,
-		Operation: operation,
-	}
-
-	r, err := client.Runs.List(context.Background(), workspaceID, options)
-	if err != nil {
-		return nil, err
-	}
-	results = append(results, r.Items...)
-
-	return results, nil
-}
-
-func listAllRuns(client *tfe.Client, workspaceID string, status string, operation string) ([]*tfe.Run, error) {
-	results := []*tfe.Run{}
-
 	currentPage := 1
 
 	for {
@@ -442,7 +413,7 @@ func listAllRuns(client *tfe.Client, workspaceID string, status string, operatio
 		options := &tfe.RunListOptions{
 			ListOptions: tfe.ListOptions{
 				PageNumber: currentPage,
-				PageSize:   50,
+				PageSize:   100,
 			},
 			Status:    status,
 			Operation: operation,
@@ -452,13 +423,18 @@ func listAllRuns(client *tfe.Client, workspaceID string, status string, operatio
 		if err != nil {
 			return nil, err
 		}
+
 		results = append(results, r.Items...)
 
-		if r.Pagination.NextPage == 0 {
+		if listAll {
+			if r.NextPage == 0 {
+				break
+			}
+			currentPage++
+		} else {
 			break
 		}
 
-		currentPage++
 	}
 
 	return results, nil
