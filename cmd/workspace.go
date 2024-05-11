@@ -89,6 +89,7 @@ var workspaceListCmd = &cobra.Command{
 		check(err)
 
 		detail, _ := cmd.Flags().GetBool("detail")
+		chunkSize, _ := cmd.Flags().GetInt("chunk-size")
 		filter, _ := cmd.Flags().GetString("filter")
 		query, _ := cmd.Flags().GetString("query")
 
@@ -123,15 +124,6 @@ var workspaceListCmd = &cobra.Command{
 			// Get additional details
 			ch := make(chan WorkspaceDetail, len(workspaces))
 
-			// Ratelimit
-			var chunkSize int
-
-			if len(workspaces) < 3 {
-				chunkSize = len(workspaces)
-			} else {
-				chunkSize = 3
-			}
-
 			log.Debugf("RateLimit: %d", chunkSize)
 
 			for i := 0; i < len(workspaces); i += chunkSize {
@@ -147,14 +139,19 @@ var workspaceListCmd = &cobra.Command{
 
 					go func(id string, name string) {
 						log.Debugf("Processing workspace: %s - %s", name, id)
+
+						start := time.Now()
 						tmpWorkspace, err := getWorkspace(client, organization, id)
 						check(err)
+
+						log.Debugf("GoRoutine Execution Took: %s", time.Since(start))
 						ch <- tmpWorkspace
 
 						wg.Done()
+
 					}(id, name)
 
-					time.Sleep(500 * time.Millisecond)
+					time.Sleep(time.Duration(chunkSize*5) * time.Millisecond)
 				}
 
 			}
@@ -386,6 +383,7 @@ func init() {
 	workspaceCmd.AddCommand(workspaceListCmd)
 	workspaceListCmd.Flags().Bool("detail", false, "Provide details about workspace")
 	workspaceListCmd.Flags().String("filter", "", "Filter workspaces by name or by tag\nTo filter by tag, prefix filter with \"tags|\"\ne.g. \"tags|tagName,tag:Name\"")
+	workspaceListCmd.Flags().Int("chunk-size", 5, "Use with the --detail flag to chunk requests to the Workspaces API")
 
 	// Get sub-command
 	workspaceCmd.AddCommand(workspaceGetCmd)
