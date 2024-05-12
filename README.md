@@ -146,7 +146,7 @@ Use "tfectl [command] --help" for more information about a command.
   ```
 
   * Run with the `--detail` flag to return the following details
-    NOTE: This task takes a long time, it rate-limited and it is recommended to run it with the `--filter` argument
+    NOTE: This task can take a long time due to rate limits. It is recommended to run it with the `--filter` argument. Running it with `-l debug` will show you how long each goroutine takes to execute. On larger deployments with hundreds of workspaces, this will take significant wall-clock time.
 
     | **Field**                  | **Description**                                                     | **Type** |
     |----------------------------|---------------------------------------------------------------------|----------|
