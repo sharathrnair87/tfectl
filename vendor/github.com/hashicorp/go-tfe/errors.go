@@ -5,6 +5,7 @@ package tfe
 
 import (
 	"errors"
+	"fmt"
 )
 
 // Generic errors applicable to all resources.
@@ -66,7 +67,7 @@ var (
 	// to determine if it is safe to delete. "conflict" followed by newline is used to
 	// preserve go-tfe version compatibility with the error constructed at runtime before it was
 	// defined here.
-	ErrWorkspaceStillProcessing = errors.New("conflict\nworkspace is still being processed to discover resources")
+	ErrWorkspaceStillProcessing = errors.New("conflict\nLatest workspace state is being processed to discover resources, please try again later")
 
 	// ErrWorkspaceNotSafeToDelete is returned when a workspace has processed state and
 	// is determined to still have resources present. "conflict" followed by newline is used to
@@ -219,6 +220,12 @@ var (
 	ErrInvalidModuleID = errors.New("invalid value for module ID")
 
 	ErrInvalidRegistryName = errors.New(`invalid value for registry-name. It must be either "private" or "public"`)
+
+	ErrInvalidCallbackURL = errors.New("invalid value for callback URL")
+
+	ErrInvalidAccessToken = errors.New("invalid value for access token")
+
+	ErrInvalidTaskResultsCallbackStatus = fmt.Errorf("invalid value for task result status. Must be either `%s`, `%s`, or `%s`", TaskFailed, TaskPassed, TaskRunning)
 )
 
 var (
@@ -243,7 +250,9 @@ var (
 
 	ErrRequiredEnabled = errors.New("enabled is required")
 
-	ErrRequiredEnforce = errors.New("enforce is required")
+	ErrRequiredEnforce = errors.New("enforce or enforcement-level is required")
+
+	ErrConflictingEnforceEnforcementLevel = errors.New("enforce and enforcement-level may not both be specified together")
 
 	ErrRequiredEnforcementPath = errors.New("enforcement path is required")
 

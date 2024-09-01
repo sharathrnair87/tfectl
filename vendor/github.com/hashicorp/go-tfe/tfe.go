@@ -158,8 +158,13 @@ type Client struct {
 	Runs                       Runs
 	RunEvents                  RunEvents
 	RunTasks                   RunTasks
+	RunTasksIntegration        RunTasksIntegration
 	RunTriggers                RunTriggers
 	SSHKeys                    SSHKeys
+	Stacks                     Stacks
+	StackConfigurations        StackConfigurations
+	StackDeployments           StackDeployments
+	StackPlans                 StackPlans
 	StateVersionOutputs        StateVersionOutputs
 	StateVersions              StateVersions
 	TaskResults                TaskResults
@@ -186,7 +191,7 @@ type Client struct {
 
 // Admin is the the Terraform Enterprise Admin API. It provides access to site
 // wide admin settings. These are only available for Terraform Enterprise and
-// do not function against Terraform Cloud
+// do not function against HCP Terraform
 type Admin struct {
 	Organizations     AdminOrganizations
 	Workspaces        AdminWorkspaces
@@ -198,7 +203,7 @@ type Admin struct {
 	Settings          *AdminSettings
 }
 
-// Meta contains any Terraform Cloud APIs which provide data about the API itself.
+// Meta contains any HCP Terraform APIs which provide data about the API itself.
 type Meta struct {
 	IPRanges IPRanges
 }
@@ -458,8 +463,13 @@ func NewClient(cfg *Config) (*Client, error) {
 	client.Runs = &runs{client: client}
 	client.RunEvents = &runEvents{client: client}
 	client.RunTasks = &runTasks{client: client}
+	client.RunTasksIntegration = &runTaskIntegration{client: client}
 	client.RunTriggers = &runTriggers{client: client}
 	client.SSHKeys = &sshKeys{client: client}
+	client.Stacks = &stacks{client: client}
+	client.StackConfigurations = &stackConfigurations{client: client}
+	client.StackDeployments = &stackDeployments{client: client}
+	client.StackPlans = &stackPlans{client: client}
 	client.StateVersionOutputs = &stateVersionOutputs{client: client}
 	client.StateVersions = &stateVersions{client: client}
 	client.TaskResults = &taskResults{client: client}
@@ -487,18 +497,23 @@ func NewClient(cfg *Config) (*Client, error) {
 	return client, nil
 }
 
-// IsCloud returns true if the client is configured against a Terraform Cloud
+// AppName returns the name of the instance.
+func (c Client) AppName() string {
+	return c.appName
+}
+
+// IsCloud returns true if the client is configured against a HCP Terraform
 // instance.
 //
-// Whether an instance is TFC or TFE is derived from the TFP-AppName header.
+// Whether an instance is HCP Terraform or Terraform Enterprise is derived from the TFP-AppName header.
 func (c Client) IsCloud() bool {
-	return c.appName == "Terraform Cloud"
+	return c.appName == "HCP Terraform"
 }
 
 // IsEnterprise returns true if the client is configured against a Terraform
 // Enterprise instance.
 //
-// Whether an instance is TFC or TFE is derived from the TFP-AppName header. Note:
+// Whether an instance is HCP Terraform or TFE is derived from the TFP-AppName header. Note:
 // not all TFE releases include this header in API responses.
 func (c Client) IsEnterprise() bool {
 	return !c.IsCloud()
@@ -506,7 +521,7 @@ func (c Client) IsEnterprise() bool {
 
 // RemoteAPIVersion returns the server's declared API version string.
 //
-// A Terraform Cloud or Enterprise API server returns its API version in an
+// A HCP Terraform or Enterprise API server returns its API version in an
 // HTTP header field in all responses. The NewClient function saves the
 // version number returned in its initial setup request and RemoteAPIVersion
 // returns that cached value.
@@ -516,7 +531,7 @@ func (c Client) IsEnterprise() bool {
 // second indicates a minor version which may have introduced some
 // backward-compatible additional features compared to its predecessor.
 //
-// Explicit API versioning was added to the Terraform Cloud and Enterprise
+// Explicit API versioning was added to the HCP Terraform and Enterprise
 // APIs as a later addition, so older servers will not return version
 // information. In that case, this function returns an empty string as the
 // version.
@@ -549,7 +564,7 @@ func (c *Client) SetFakeRemoteAPIVersion(fakeAPIVersion string) {
 // HTTP header field in all responses. This value is saved by the client
 // during the initial setup request and RemoteTFEVersion returns that cached
 // value. This function returns an empty string for any Terraform Enterprise version
-// earlier than v202208-3 and for Terraform Cloud.
+// earlier than v202208-3 and for HCP Terraform.
 func (c Client) RemoteTFEVersion() string {
 	return c.remoteTFEVersion
 }
@@ -600,7 +615,7 @@ func (c *Client) retryHTTPBackoff(min, max time.Duration, attemptNum int, resp *
 //
 // min and max are mainly used for bounding the jitter that will be added to
 // the reset time retrieved from the headers. But if the final wait time is
-// less then min, min will be used instead.
+// less than min, min will be used instead.
 func rateLimitBackoff(min, max time.Duration, resp *http.Response) time.Duration {
 	// rnd is used to generate pseudo-random numbers.
 	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -639,7 +654,7 @@ type rawAPIMetadata struct {
 	// field was not included in the response.
 	RateLimit string
 
-	// AppName is either 'Terraform Cloud' or 'Terraform Enterprise'
+	// AppName is either 'HCP Terraform' or 'Terraform Enterprise'
 	AppName string
 }
 
