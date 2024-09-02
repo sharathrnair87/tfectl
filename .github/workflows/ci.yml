@@ -38,17 +38,16 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write-all
-    if: ${{ github.actor == 'dependabot[bot]' && github.event_name == 'pull_request' }}
+    if: github.event.pull_request.user.login = 'dependabot[bot]'
     steps:
       - name: metadata
         id: metadata
-        uses: dependabot/fetch-metadata@v1.6.0
-        with:
-          github-token: '${{ secrets.GITHUB_TOKEN }}'
+        uses: dependabot/fetch-metadata@v2
       - name: Enable auto-merge for Dependabot PRs
+        if: steps.metadata.outputs.update-type == 'version-update:semver-patch'
         run: gh pr merge --auto --merge "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           # Use personal token
           # https://github.com/dependabot/fetch-metadata?tab=readme-ov-file#enabling-auto-merge
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
